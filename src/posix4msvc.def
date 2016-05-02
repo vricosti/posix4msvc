@@ -1,0 +1,20 @@
+LIBRARY posix4msvc.dll
+
+EXPORTS
+asprintf
+vasprintf
+opendir
+readdir
+closedir
+rewinddir
+telldir
+seekdir
+dirfd
+setenv
+unsetenv
+fcntl
+openat
+fstatat
+unlinkat
+strlcat
+strlcpy
