@@ -152,5 +152,9 @@ typedef _sigset_t	sigset_t;
 #endif
 #endif	/* Not _SIGSET_T_ */
 
+
+#define OPEN_MAX	512
+#define _PATH_TMP   "/tmp/"
+
 #endif	/* _INC_TYPES */
 

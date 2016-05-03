@@ -229,6 +229,7 @@ extern int   __cdecl rmtmp(void);
 
 
 int __cdecl fchmod(int fd, mode_t mode);
+int __cdecl  usleep(useconds_t);
 
 /* normally defined inside <stdio.h>*/
 int __cdecl asprintf(char **strp, const char *fmt, ...);
