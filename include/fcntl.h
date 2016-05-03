@@ -198,20 +198,46 @@ extern int __cdecl fcntl(int fd, int cmd, ... /* arg */ );
 #endif
 
 #ifdef _USE_32BIT_TIME_T
-#define fstat      _fstat32
-#define fstati64   _fstat32i64
-#define stat       _stat32
-#define stati64    _stat32i64
-#define wstat      _wstat32
-#define wstati64   _wstat32i64
+struct _stat32
+{
+	_dev_t         st_dev;
+	_ino_t         st_ino;
+	unsigned short st_mode;
+	short          st_nlink;
+	short          st_uid;
+	short          st_gid;
+	_dev_t         st_rdev;
+	_off_t         st_size;
+	__time32_t     st_atime;
+	__time32_t     st_mtime;
+	__time32_t     st_ctime;
+};
+
+#define os_stat _stat32
+#define os_fstat _fstat32
+
 #else
-#define fstat      _fstat64i32
-#define fstati64   _fstat64
-#define stat       _stat64i32
-#define stati64    _stat64
-#define wstat      _wstat64i32
-#define wstati64   _wstat64
+struct stat
+{
+	_dev_t         st_dev;
+	_ino_t         st_ino;
+	unsigned short st_mode;
+	short          st_nlink;
+	short          st_uid;
+	short          st_gid;
+	_dev_t         st_rdev;
+	_off_t         st_size;
+	__time64_t     st_atime;
+	__time64_t     st_mtime;
+	__time64_t     st_ctime;
+};
+
+#define os_stat		_stat64i32
+#define os_fstat	_fstat64i32
+
 #endif
+
+
 
 extern char *__cdecl strdup(const char *s);
 extern pid_t __cdecl getpid(void);
@@ -222,7 +248,9 @@ extern int __cdecl fchmod(int fd, mode_t mode);
 extern int __cdecl open(const char*, int, ...);
 extern int __cdecl close(int fd);
 extern int __cdecl creat(const char*, mode_t);
-extern int __cdecl stat(char const* _FileName, struct stat* _Stat);
+extern int __cdecl stat(char const* pathname, struct stat* _Stat);
+extern int __cdecl fstat(int fd, struct stat *buf);
+extern int __cdecl lstat(const char *path, struct stat *buf);
 extern int __cdecl dup(int oldfd);
 extern int __cdecl dup2(int oldfd, int newfd);
 extern int __cdecl eof(int fd);
@@ -230,6 +258,7 @@ extern long __cdecl filelength(int fd);
 extern int __cdecl isatty(int fd);
 extern int __cdecl locking(int fd, int mode, long nbytes);
 extern long _cdecl lseek(int fd, long offset, int origin);
+extern off64_t __cdecl  lseek64(int fd, off64_t offset, int whence);
 extern char *_cdecl mktemp(char *template);
 extern ssize_t _cdecl read(int fd, void *buf, size_t count);
 extern void *_cdecl setmode(const char *mode_str); /* msvc implementation returns int */

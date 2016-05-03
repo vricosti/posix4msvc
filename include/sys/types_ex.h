@@ -28,6 +28,10 @@ typedef _dev_t dev_t;
 
 typedef long _off_t;
 typedef _off_t off_t;
+
+typedef __int64 _off64_t;
+typedef _off64_t off64_t;
+
 #endif
 
 

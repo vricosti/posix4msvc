@@ -8,12 +8,15 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winioctl.h>
+
 #include <direct.h>
 #include <io.h>
 #include <fcntl.h>
 #include <string.h>
 #include <bsd/string.h> /*strlcat && strlcpy*/
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include <get_osfhandle-nothrow.h>
@@ -25,6 +28,8 @@
 
 
 
+int __cdecl
+sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode);
 
 int __cdecl
 __openat(int fd, const char *pathname, int flags, mode_t mode);
@@ -91,6 +96,8 @@ openat(int fd, const char *pathname, int flags, ...)
 
 
 
+
+
 int __cdecl
 __openat(int dirfd, const char *pathname, int flags, mode_t mode)
 {
@@ -112,7 +119,7 @@ __openat(int dirfd, const char *pathname, int flags, mode_t mode)
 	p4msvc_norm_path_t norm_path;
 	szNormPath = p4msvc_norm_path(pathname, &norm_path, TRUE);
 	if (norm_path.isAbsolute) {
-		return _open(szNormPath, flags, mode);
+		return sys_open(szNormPath, norm_path.st_mode, flags, mode);
 	}
 
 	// If we receive a file descriptor first check 
@@ -159,11 +166,105 @@ __openat(int dirfd, const char *pathname, int flags, mode_t mode)
 	strlcat(szBuffer, "\\", MAX_PATH);
 	strlcat(szBuffer, pathname, MAX_PATH);
 
-	fd = _open(szBuffer, flags, mode);
+	fd = sys_open(szBuffer, S_IFREG, flags, mode);
 
 
 	return fd;
 }
+
+int __cdecl
+sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
+{
+	int fd = -1;
+
+	if (S_ISBLK(st_mode))
+	{
+		HANDLE hDevBlock = CreateFile(pathname,
+			GENERIC_READ,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+		if (hDevBlock != INVALID_HANDLE_VALUE)
+		{
+			fd = _open_osfhandle((intptr_t)hDevBlock, 0);
+		}
+	}
+	else
+	{
+		fd = _open(pathname, flags, mode);
+	}
+
+	return fd;
+}
+
+int __cdecl 
+sys_stat(const char *path, struct stat *buf)
+{
+	// First we check pathname is valid
+	if (!path || path[0] == '\0') {
+		_set_errno(ENOENT);
+		return -1;
+	}
+
+	return -1;
+}
+
+int __cdecl
+stat(const char *path, struct stat *buf)
+{
+	int ret;
+
+	ret = os_stat(path, (struct os_stat *)buf);
+	if (ret < 0)
+	{
+		int err = errno;
+	}
+	return ret;
+}
+
+
+
+int __cdecl 
+fstat(int fd, struct stat *buf)
+{
+	int ret;
+	HANDLE handle;
+
+	ret = -1;
+
+	/* first check this fd is not backed up by a handle */
+	handle = (HANDLE)_get_osfhandle(fd);
+	if (handle != INVALID_HANDLE_VALUE)
+	{
+		/* is it a device handle ?*/
+		if (FILE_TYPE_DISK == GetFileType(handle))
+		{
+			ret = 0;
+
+			if (buf)
+			{
+				buf->st_dev = 6;
+				buf->st_ino = 0;
+				buf->st_nlink = 1;
+				buf->st_mode = S_IFBLK;
+				buf->st_uid = 0;
+				buf->st_gid = 6;
+				buf->st_rdev = 2048;
+				buf->st_size = 0;
+			}
+		}
+	}
+	else
+	{
+		ret = os_fstat(fd, (struct os_stat *)buf);
+	}
+	
+	return ret;
+}
+
+
 
 int __cdecl
 fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)

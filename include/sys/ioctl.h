@@ -12,6 +12,7 @@
 /* All the headers include this file. */
 #include <crtdefs.h>
 
+extern int __cdecl ioctl(int fd, unsigned long request, ...);
 
 
 #endif	/* Not _IOCTL_H_ */
