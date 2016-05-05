@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winioctl.h>
+#include <tchar.h>
 
 #include <direct.h>
 #include <io.h>
@@ -176,10 +177,30 @@ int __cdecl
 sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 {
 	int fd = -1;
+	HANDLE hDevBlock;
+	char szPath[MAX_PATH];
+	char str[3];
+	size_t ulLen, offset;
+	int number;
+	DWORD dwRet;
+
+	offset = 0;
 
 	if (S_ISBLK(st_mode))
 	{
-		HANDLE hDevBlock = CreateFile(pathname,
+		ulLen = strlcpy(szPath, pathname, MAX_PATH);
+
+		if (!strncmp(szPath, "/dev/sd", 7))
+		{
+			if ((ulLen == sizeof("/dev/sdx") - 1) && isalpha(pathname[7]))
+			{
+				strlcpy(szPath, "\\\\.\\PhysicalDrive", MAX_PATH);
+				snprintf(str, sizeof(str), "%d", (toupper(pathname[7]) - 'A'));
+				strlcat(szPath, str, MAX_PATH);
+			}
+		}
+
+		hDevBlock = CreateFile(szPath,
 			GENERIC_READ,
 			0,
 			NULL,
@@ -189,6 +210,10 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 		if (hDevBlock != INVALID_HANDLE_VALUE)
 		{
 			fd = _open_osfhandle((intptr_t)hDevBlock, 0);
+			if (offset)
+			{
+				dwRet = SetFilePointer(hDevBlock, offset, NULL, FILE_BEGIN);
+			}
 		}
 	}
 	else

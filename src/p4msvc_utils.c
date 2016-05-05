@@ -10,7 +10,6 @@ p4msvc_norm_path(const char* pathname, p4msvc_norm_path_t* pPath, int normalize)
 {
 	size_t ulLen = 0;
 	const char* szRet = NULL;
-	char str[3];
 
 	if (!pathname || !pPath)
 		return NULL;
@@ -43,15 +42,7 @@ p4msvc_norm_path(const char* pathname, p4msvc_norm_path_t* pPath, int normalize)
 		else if (!strncmp(pathname, "/dev/sd", 7))
 		{
 			pPath->isAbsolute = TRUE;
-			if ((ulLen == sizeof("/dev/sdx") - 1) && isalpha(pathname[7]))
-			{
-				strlcpy(pPath->szNormalizedPath, "\\\\.\\PhysicalDrive", MAX_PATH);
-				snprintf(str, sizeof(str), "%d", (toupper(pathname[7]) - 'A'));
-				strlcat(pPath->szNormalizedPath, str, MAX_PATH);
-				pPath->st_mode = S_IFBLK;
-				pPath->isNormalized = TRUE;
-				szRet = pPath->szNormalizedPath;
-			}
+			pPath->st_mode = S_IFBLK;
 		}
 		/* handle /c/foo.txt and => c:/foo.txt */
 		else if ((pathname[0] == '/') && (isalpha(pathname[1])) &&
