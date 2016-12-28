@@ -9,17 +9,23 @@ project(posix4msvc)
 file(GLOB_RECURSE lib_src src/*.def src/*.c src/*.h include/*.h)
 list(REMOVE_ITEM lib_src ${CMAKE_CURRENT_SOURCE_DIR}/src/_tdirent.c)
 
+include_directories(../windevblk/include)
 
-add_library(posix4msvc SHARED
-  ${lib_src}
+add_library(
+	posix4msvc
+	${lib_src}
 )
 
 
 
-target_include_directories(posix4msvc PUBLIC
+target_include_directories(
+	posix4msvc PUBLIC
     include
 	src
 )
 
 
-
+target_link_libraries(
+        posix4msvc
+		windevblk
+)

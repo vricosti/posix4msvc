@@ -23,6 +23,7 @@
 #include <get_osfhandle-nothrow.h>
 #include <p4msvc_utils.h>
 
+#include "windevblk.h"
 
 
 
@@ -179,10 +180,13 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 	int fd = -1;
 	HANDLE hDevBlock;
 	char szPath[MAX_PATH];
-	char str[3];
+	char str[7];
 	size_t ulLen, offset;
-	int number;
+	int devNb, partNb;
+    char * pEnd;
 	DWORD dwRet;
+    HDEVBLK hDevBlk;
+    HANDLE hDisk;
 
 	offset = 0;
 
@@ -192,27 +196,21 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 
 		if (!strncmp(szPath, "/dev/sd", 7))
 		{
-			if ((ulLen == sizeof("/dev/sdx") - 1) && isalpha(pathname[7]))
+			if ((ulLen >= sizeof("/dev/sdx") - 1) && isalpha(pathname[7]))
 			{
-				strlcpy(szPath, "\\\\.\\PhysicalDrive", MAX_PATH);
-				snprintf(str, sizeof(str), "%d", (toupper(pathname[7]) - 'A'));
-				strlcat(szPath, str, MAX_PATH);
-			}
-		}
+                if (pathname[7] >= 'a' && pathname[7] <= 'z')
+                {                
+                    devNb = pathname[7] - 'a';
+                    partNb = strtol(pathname + 8, &pEnd, 10);
+                    hDevBlk = DevBlkOpen(devNb, partNb, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE);
+                    if (hDevBlk)
+                    {
+                        hDisk = DevBlkGetDiskHandle(hDevBlk);
+                        fd = _open_osfhandle((intptr_t)hDisk, 0);
+                    }
 
-		hDevBlock = CreateFile(szPath,
-			GENERIC_READ,
-			0,
-			NULL,
-			OPEN_EXISTING,
-			0,
-			NULL);
-		if (hDevBlock != INVALID_HANDLE_VALUE)
-		{
-			fd = _open_osfhandle((intptr_t)hDevBlock, 0);
-			if (offset)
-			{
-				dwRet = SetFilePointer(hDevBlock, offset, NULL, FILE_BEGIN);
+                    
+                }				
 			}
 		}
 	}

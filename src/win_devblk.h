@@ -26,7 +26,7 @@ extern "C" {
 	} DISKINFO, *PDISKINFO;
 
 
-	typedef struct _DEVBLK
+	typedef struct _PARTITION_INFO
 	{
 		PDISKINFO pDiskInfo;
 		DWORD PartitionStyle;
@@ -48,7 +48,7 @@ extern "C" {
 		DWORD	dwFileSystemFlags;
 
 
-	} DEVBLK, *PDEVBLK;
+	} PARTITION_INFO, *PPARTITION_INFO;
 
 
 
