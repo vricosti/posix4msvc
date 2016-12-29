@@ -138,6 +138,8 @@
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 #endif	/* !SEEK_SET */
 
+#include <sys/stat_ex.h>
+#if TRYREFACTOR
 /*
 * [XSI] The symbolic names for file modes for use as values of mode_t
 * shall be defined as described in <sys/stat.h>
@@ -184,6 +186,7 @@
 #define	S_IEXEC		S_IXUSR		/* backward compatability */
 #endif
 #endif	/* !S_IFMT */
+#endif
 
 #ifdef  __cplusplus
 extern "C" {
@@ -197,45 +200,45 @@ extern int __cdecl fcntl(int fd, int cmd, ... /* arg */ );
 #pragma clang diagnostic ignored "-Winconsistent-dllimport"
 #endif
 
-#ifdef _USE_32BIT_TIME_T
-struct _stat32
-{
-	_dev_t         st_dev;
-	_ino_t         st_ino;
-	unsigned short st_mode;
-	short          st_nlink;
-	short          st_uid;
-	short          st_gid;
-	_dev_t         st_rdev;
-	_off_t         st_size;
-	__time32_t     st_atime;
-	__time32_t     st_mtime;
-	__time32_t     st_ctime;
-};
-
-#define os_stat _stat32
-#define os_fstat _fstat32
-
-#else
-struct stat
-{
-	_dev_t         st_dev;
-	_ino_t         st_ino;
-	unsigned short st_mode;
-	short          st_nlink;
-	short          st_uid;
-	short          st_gid;
-	_dev_t         st_rdev;
-	_off_t         st_size;
-	__time64_t     st_atime;
-	__time64_t     st_mtime;
-	__time64_t     st_ctime;
-};
-
-#define os_stat		_stat64i32
-#define os_fstat	_fstat64i32
-
-#endif
+//#ifdef _USE_32BIT_TIME_T
+//struct _stat32
+//{
+//	_dev_t         st_dev;
+//	_ino_t         st_ino;
+//	unsigned short st_mode;
+//	short          st_nlink;
+//	short          st_uid;
+//	short          st_gid;
+//	_dev_t         st_rdev;
+//	_off_t         st_size;
+//	__time32_t     st_atime;
+//	__time32_t     st_mtime;
+//	__time32_t     st_ctime;
+//};
+//
+//#define os_stat _stat32
+//#define os_fstat _fstat32
+//
+//#else
+//struct stat
+//{
+//	_dev_t         st_dev;
+//	_ino_t         st_ino;
+//	unsigned short st_mode;
+//	short          st_nlink;
+//	short          st_uid;
+//	short          st_gid;
+//	_dev_t         st_rdev;
+//	_off_t         st_size;
+//	__time64_t     st_atime;
+//	__time64_t     st_mtime;
+//	__time64_t     st_ctime;
+//};
+//
+//#define os_stat		_stat64i32
+//#define os_fstat	_fstat64i32
+//
+//#endif //_USE_32BIT_TIME_T
 
 
 

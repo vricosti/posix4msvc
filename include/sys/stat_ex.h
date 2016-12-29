@@ -57,52 +57,52 @@
 #include <sys/time.h>
 #endif
 
-//#if __STDC__
-//
-//#ifdef __clang__
-//#pragma clang diagnostic ignored "-Winconsistent-dllimport"
-//#endif
-//
-// #ifdef _USE_32BIT_TIME_T
-// struct _stat32
-// {
-// 	_dev_t         st_dev;
-// 	_ino_t         st_ino;
-// 	unsigned short st_mode;
-// 	short          st_nlink;
-// 	short          st_uid;
-// 	short          st_gid;
-// 	_dev_t         st_rdev;
-// 	_off_t         st_size;
-// 	__time32_t     st_atime;
-// 	__time32_t     st_mtime;
-// 	__time32_t     st_ctime;
-// };
-// 
-// #define os_stat _stat32
-// #define os_fstat _fstat32
-// 
-// #else
-// struct stat
-// {
-// 	_dev_t         st_dev;
-// 	_ino_t         st_ino;
-// 	unsigned short st_mode;
-// 	short          st_nlink;
-// 	short          st_uid;
-// 	short          st_gid;
-// 	_dev_t         st_rdev;
-// 	_off_t         st_size;
-// 	__time64_t     st_atime;
-// 	__time64_t     st_mtime;
-// 	__time64_t     st_ctime;
-// };
-// 
-// #define os_stat		_stat64i32
-// #define os_fstat	_fstat64i32
-// 
-// #endif //_USE_32BIT_TIME_T
-//#endif
+#if __STDC__
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Winconsistent-dllimport"
+#endif
+
+ #ifdef _USE_32BIT_TIME_T
+ struct _stat32
+ {
+ 	_dev_t         st_dev;
+ 	_ino_t         st_ino;
+ 	unsigned short st_mode;
+ 	short          st_nlink;
+ 	short          st_uid;
+ 	short          st_gid;
+ 	_dev_t         st_rdev;
+ 	_off_t         st_size;
+ 	__time32_t     st_atime;
+ 	__time32_t     st_mtime;
+ 	__time32_t     st_ctime;
+ };
+ 
+ #define os_stat _stat32
+ #define os_fstat _fstat32
+ 
+ #else
+ struct stat
+ {
+ 	_dev_t         st_dev;
+ 	_ino_t         st_ino;
+ 	unsigned short st_mode;
+ 	short          st_nlink;
+ 	short          st_uid;
+ 	short          st_gid;
+ 	_dev_t         st_rdev;
+ 	_off_t         st_size;
+ 	__time64_t     st_atime;
+ 	__time64_t     st_mtime;
+ 	__time64_t     st_ctime;
+ };
+ 
+ #define os_stat		_stat64i32
+ #define os_fstat	_fstat64i32
+ 
+ #endif //_USE_32BIT_TIME_T
+#endif
 
 //struct stat {
 //	dev_t	  st_dev;		/* inode's device */
@@ -182,6 +182,17 @@
 #define	S_IROTH	0000004			/* R for other */
 #define	S_IWOTH	0000002			/* W for other */
 #define	S_IXOTH	0000001			/* X for other */
+
+
+ // Windows already defined them so we undefine first to avoid warnings
+#undef _S_IFMT  
+#undef _S_IFDIR 
+#undef _S_IFCHR 
+#undef _S_IFIFO 
+#undef _S_IFREG 
+#undef _S_IREAD 
+#undef _S_IWRITE
+#undef _S_IEXEC 
 
 #define	_S_IFMT	  0170000		/* type of file mask */
 #define	_S_IFIFO  0010000		/* named pipe (fifo) */
@@ -284,10 +295,17 @@
 #define UTIME_OMIT	((1 << 30) - 2)
 #endif
 
-#if !defined(_KERNEL) && !defined(_STANDALONE)
-#include <sys/cdefs.h>
 
-__BEGIN_DECLS
+#if !defined(_KERNEL) && !defined(_STANDALONE)
+ /*
+ * THE INCLUDE BELOW(sys/cdefs.h) CAUSES LINKER ERROR
+ * Error	LNK2005	___acrt_get_locale_data_prefix already defined in libblkid.lib(probe.obj)
+ * Error	LNK2005	__chvalidchk_l already defined in libblkid.lib(probe.obj)
+ * ...
+ */
+//#include <sys/cdefs.h>
+
+//__BEGIN_DECLS
 //int	chmod(const char *, mode_t);
 //int	mkdir(const char *, mode_t);
 //int	mkfifo(const char *, mode_t);
@@ -341,7 +359,7 @@ __BEGIN_DECLS
 //#endif
 //#endif
 
-__END_DECLS
+//__END_DECLS
 
 #endif /* !_KERNEL && !_STANDALONE */
 #endif /* !_SYS_STATEX_H_ */

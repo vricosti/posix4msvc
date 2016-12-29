@@ -17,7 +17,11 @@
 #include <stdlib_ex.h>
 
 /***********************************************************************/
-/* Normally inside <sys/stat.h> */
+// Since sys/stat.h is already defined by microsoft we include missing definitions
+// from here and also from unistd.h
+#include <sys/stat_ex.h>
+
+#if BEFORE_PUTTING_IN_STAT_EX
 #define	_S_IFBLK	0x3000	/* Block: Is this ever set under w32? */
 
 #define S_IFMT _S_IFMT
@@ -29,6 +33,12 @@
 #define S_IEXEC _S_IEXEC
 #define	S_IFIFO		_S_IFIFO
 #define	S_IFBLK		_S_IFBLK
+
+#define	S_ISUID	0004000			/* set user id on execution */
+#define	S_ISGID	0002000			/* set group id on execution */
+#if defined(_NETBSD_SOURCE)
+#define	S_ISTXT	0001000			/* sticky bit */
+#endif
 
 #define	_S_IRWXU	(_S_IREAD | _S_IWRITE | _S_IEXEC)
 #define	_S_IXUSR	_S_IEXEC
@@ -55,6 +65,7 @@
 #define	S_ISCHR(m)	(((m) & S_IFMT) == S_IFCHR)
 #define	S_ISBLK(m)	(((m) & S_IFMT) == S_IFBLK)
 #define	S_ISREG(m)	(((m) & S_IFMT) == S_IFREG)
+#endif
 /***********************************************************************/
 
 
