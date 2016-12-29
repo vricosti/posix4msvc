@@ -3,20 +3,33 @@
 #include <sys/types_ex.h>
 
 #include <get_osfhandle-nothrow.h>
-
+#include "windevblk.h"
 
 long _cdecl 
 lseek(int fd, long offset, int origin)
 {
 	long lret;
 	HANDLE handle;
+    LARGE_INTEGER liOffset, liNewOffset;
 
 	lret = -1L;
 
 	handle = (HANDLE)_get_osfhandle(fd);
 	if (handle != INVALID_HANDLE_VALUE)
 	{
-		lret = SetFilePointer(handle, offset, (void*)0, origin);
+        HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
+        if (hDevBlk)
+        {
+            liOffset.QuadPart = offset;
+            if (DevBlkSetPointerEx(handle, liOffset, &liNewOffset, origin))
+            {
+                lret = liNewOffset.LowPart;
+            }
+        }
+        else
+        {
+            lret = SetFilePointer(handle, offset, (void*)0, origin);
+        }
 	}
 	else
 	{
@@ -38,9 +51,23 @@ lseek64(int fd, off64_t offset, int whence)
 	handle = (HANDLE)_get_osfhandle(fd);
 	if (handle != INVALID_HANDLE_VALUE)
 	{	
-		liOffset.QuadPart = offset;
-		ret = SetFilePointerEx(handle, liOffset, &liNewOffset, whence);
-		lret = liNewOffset.QuadPart;
+        HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
+        if (hDevBlk)
+        {
+            liOffset.QuadPart = offset;
+            if (DevBlkSetPointerEx(hDevBlk, liOffset, &liNewOffset, whence) == TRUE)
+            {
+                lret = liNewOffset.QuadPart;
+            }
+        }
+        else
+        {
+            liOffset.QuadPart = offset;
+            if (SetFilePointerEx(handle, liOffset, &liNewOffset, whence) == TRUE)
+            {
+                lret = liNewOffset.QuadPart;
+            }
+        }
 	}
 	else
 	{
@@ -56,16 +83,33 @@ read(int fd, void *buf, size_t count)
 	HANDLE handle;
 	DWORD dwReadLen, dwErr;
 
+    size = -1;
 	handle = (HANDLE)_get_osfhandle(fd);
 	if (handle != INVALID_HANDLE_VALUE)
 	{
-		size = -1;
-		if (ReadFile(handle, buf, count, &dwReadLen, NULL))
-			size = dwReadLen;
-		else
-		{
-			dwErr = GetLastError();
-		}
+        HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
+        if (hDevBlk)
+        {
+            if (DevBlkRead(hDevBlk, buf, count, &dwReadLen))
+            {
+                size = dwReadLen;
+            }
+            else
+            {
+                dwErr = GetLastError();
+            }
+        }
+        else
+        {
+            if (ReadFile(handle, buf, count, &dwReadLen, NULL))
+            {
+                size = dwReadLen;
+            }
+            else
+            {
+                dwErr = GetLastError();
+            }
+        }
 	}
 	else
 	{
