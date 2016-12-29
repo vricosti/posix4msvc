@@ -1,9 +1,49 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <sys/types_ex.h>
+#include <io.h>
+#include <stdlib.h>
+#include <errno.h>
 
 #include <get_osfhandle-nothrow.h>
 #include "windevblk.h"
+
+
+int __cdecl 
+link(const char *oldpath, const char *newpath)
+{
+    return 0;
+}
+
+int __cdecl 
+access(const char *pathname, int mode)
+{
+    return _access(pathname, mode);
+}
+
+char __cdecl
+*realpath(const char *name, char *resolved)
+{
+    char *retname = NULL;  
+
+    if (name == NULL)
+        errno = EINVAL;
+
+    else if (access(name, 4) == 0)
+    {
+        if ((retname = resolved) == NULL)
+        {
+            retname = malloc(MAX_PATH);
+        }
+
+        if (retname == NULL)
+            errno = ENOMEM;
+        else if ((retname = _fullpath(retname, name, MAX_PATH)) == NULL)
+            errno = ENAMETOOLONG;
+    }
+
+    return retname;
+}
 
 long _cdecl 
 lseek(int fd, long offset, int origin)

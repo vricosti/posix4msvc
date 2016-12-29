@@ -104,6 +104,17 @@
 extern "C" {
 #endif
 
+int __cdecl link(const char *oldpath, const char *newpath);
+int __cdecl access(const char *pathname, int mode);
+uid_t __cdecl getuid(void);
+uid_t __cdecl geteuid(void);
+gid_t __cdecl getgid(void);
+gid_t __cdecl getegid(void);
+int __cdecl seteuid(uid_t euid);
+int __cdecl setegid(gid_t egid);
+char * __cdecl ttyname(int fd);
+int __cdecl ttyname_r(int fd, char *buf, size_t buflen);
+
 #if 0
 
 #pragma push_macro("sleep")

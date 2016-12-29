@@ -36,6 +36,38 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode);
 int __cdecl
 __openat(int fd, const char *pathname, int flags, mode_t mode);
 
+//TODO move somewhere else
+
+uid_t __cdecl 
+getuid(void) { return 0; }
+
+uid_t __cdecl 
+geteuid(void) { return 0; }
+
+gid_t __cdecl 
+getgid(void) { return 0; }
+
+gid_t __cdecl 
+getegid(void) { return 0; }
+
+int __cdecl 
+seteuid(uid_t euid) { return 0;  }
+
+int __cdecl 
+setegid(gid_t egid) { return 0; }
+
+char * __cdecl 
+ttyname(int fd)
+{
+    return NULL;
+}
+
+int __cdecl 
+ttyname_r(int fd, char *buf, size_t buflen)
+{
+    return ENOTTY;
+}
+
 
 int __cdecl
 fcntl(int fd, int cmd, ... /* arg */)
