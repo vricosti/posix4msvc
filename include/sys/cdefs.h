@@ -145,6 +145,12 @@
  * GCC2 provides __extension__ to suppress warnings for various GNU C
  * language extensions under "-ansi -pedantic".
  */
+ #if __GNUC_PREREQ__(2, 5)
+#define	__constfunc	__attribute__((__const__))
+#else
+#define	__constfunc
+#endif
+
 #if !__GNUC_PREREQ__(2, 0)
 #define	__extension__		/* delete __extension__ if non-gcc or gcc1 */
 #endif
@@ -216,6 +222,20 @@
 #define	__restrict	/* delete __restrict when not supported */
 #endif
 #endif
+
+/*
+ * Only to be used in other headers that are included from both c or c++
+ * NOT to be used in code.
+ */
+#ifdef __cplusplus
+#define __CAST(__dt, __st)	static_cast<__dt>(__st)
+#else
+#define __CAST(__dt, __st)	((__dt)(__st))
+#endif
+
+#define __CASTV(__dt, __st)	__CAST(__dt, __CAST(void *, __st))
+#define __CASTCV(__dt, __st)	__CAST(__dt, __CAST(const void *, __st))
+
 /*
  * C99 defines __func__ predefined identifier, which was made available
  * in GCC 2.95.
