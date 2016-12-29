@@ -3,7 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-	   
+#include <errno.h>
+
 #if (defined _WIN32 || defined __WIN32__) && ! defined __CYGWIN__
 
 int __cdecl

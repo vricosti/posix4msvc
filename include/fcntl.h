@@ -138,6 +138,8 @@
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 #endif	/* !SEEK_SET */
 
+#include <sys/stat_ex.h>
+#if TRYREFACTOR
 /*
 * [XSI] The symbolic names for file modes for use as values of mode_t
 * shall be defined as described in <sys/stat.h>
@@ -184,6 +186,7 @@
 #define	S_IEXEC		S_IXUSR		/* backward compatability */
 #endif
 #endif	/* !S_IFMT */
+#endif
 
 #ifdef  __cplusplus
 extern "C" {
@@ -235,7 +238,7 @@ struct stat
 #define os_stat		_stat64i32
 #define os_fstat	_fstat64i32
 
-#endif
+#endif //_USE_32BIT_TIME_T
 
 
 

@@ -21,6 +21,8 @@ add_library(
 target_include_directories(
 	posix4msvc PUBLIC
     include
+	include/bsd
+	include/sys/arch
 	src
 )
 
