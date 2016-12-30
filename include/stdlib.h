@@ -10,7 +10,7 @@
 #define _STDLIB_EX_H_
 
 //#include <sys/cdefs.h>
-#include <stdlib.h>
+#include_next <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {

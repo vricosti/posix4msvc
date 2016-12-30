@@ -1,4 +1,4 @@
-#include <bsd/string.h>
+//#include <bsd/string.h>
 #include <string.h>
 
 #if !HAVE_STRLCAT

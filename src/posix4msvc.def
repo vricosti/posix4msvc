@@ -30,3 +30,15 @@ faccessat
 basename
 lseek64
 mkstemp
+getopt
+geteuid
+getuid
+getgid
+getegid
+seteuid
+setegid
+ttyname
+ttyname_r
+fchmod
+link
+realpath

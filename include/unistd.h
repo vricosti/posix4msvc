@@ -13,8 +13,8 @@
 #include <sys/types.h>
 #include <sys/types_ex.h>
 #include <strings.h>
-#include <stdio.h>
-#include <stdlib_ex.h>
+#include "stdio.h"
+#include "stdlib.h"
 
 /***********************************************************************/
 // Since sys/stat.h is already defined by microsoft we include missing definitions

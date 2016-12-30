@@ -2,7 +2,7 @@
 #define	_BSD_STRING_H_
 
 //#include <sys/cdefs.h>
-
+#include_next "string.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

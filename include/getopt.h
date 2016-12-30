@@ -2,6 +2,11 @@
 #ifndef _P4MSVC_GETOPT_H_
 #define _P4MSVC_GETOPT_H_
 
+#ifdef DLLEXPORTS
+#define P4W_API __declspec(dllexport)
+#else
+#define P4W_API __declspec(dllimport)
+#endif
 
 #ifdef  __cplusplus
 extern "C" {
@@ -11,8 +16,8 @@ extern const int no_argument;
 extern const int required_argument;
 extern const int optional_argument;
 
-extern char* optarg;
-extern int optind, opterr, optopt;
+P4W_API extern char* optarg;
+P4W_API extern int optind, opterr, optopt;
 
 struct option {
   const char* name;

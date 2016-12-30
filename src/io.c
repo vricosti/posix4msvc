@@ -60,11 +60,7 @@ lseek(int fd, long offset, int origin)
         HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
         if (hDevBlk)
         {
-            liOffset.QuadPart = offset;
-            if (DevBlkSetPointerEx(handle, liOffset, &liNewOffset, origin))
-            {
-                lret = liNewOffset.LowPart;
-            }
+            lret = DevBlkSetPointer(hDevBlk, offset, (void*)0, origin);
         }
         else
         {
@@ -130,7 +126,7 @@ read(int fd, void *buf, size_t count)
         HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
         if (hDevBlk)
         {
-            if (DevBlkRead(hDevBlk, buf, count, &dwReadLen))
+            if (DevBlkRead(hDevBlk, buf, count, &dwReadLen, NULL))
             {
                 size = dwReadLen;
             }
