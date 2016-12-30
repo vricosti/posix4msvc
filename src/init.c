@@ -7,12 +7,12 @@
 static BOOL g_isInited = FALSE;
 static CRITICAL_SECTION g_critSec;
 
-static HOOK_TRACE_INFO g_hHook;
-
 void init(void);
 void cleanup(void);
+
 void init_hooking(void);
 void cleanup_hooking(void);
+static HOOK_TRACE_INFO g_hHook;
 
 // Some useful macros
 #define PPCAT_NX(A, B) A ## B
