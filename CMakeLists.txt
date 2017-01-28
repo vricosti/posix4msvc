@@ -13,15 +13,13 @@ include_directories(../windevblk/include)
 
 
 
-add_library(
-	posix4msvc SHARED
+add_library(posix4msvc SHARED
 	${lib_src}
 )
 
-add_definitions(-DDLLEXPORTS)
+add_definitions(-DDLLEXPORTS -DTEST)
 
-target_include_directories(
-	posix4msvc PUBLIC
+target_include_directories(posix4msvc PUBLIC
     include
 	include/bsd
 	include/sys/arch
@@ -30,9 +28,10 @@ target_include_directories(
 )
 
 #../3rdparty/easyhook/lib/EasyHook32.lib
+#find_library(Shlwapi_LIBPATH Shlwapi)
 
-target_link_libraries(
-        posix4msvc
+target_link_libraries(posix4msvc
+		${Shlwapi_LIBPATH}
 		windevblk
 		C:/Developer/msys64/home/Vincent/posix4win/util-linux/posix4msvc/3rdparty/easyhook/lib/EasyHook32.lib
 )

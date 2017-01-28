@@ -1,6 +1,7 @@
 LIBRARY posix4msvc.dll
 
 EXPORTS
+access
 asprintf
 vasprintf
 opendir
@@ -16,10 +17,13 @@ fcntl
 ioctl
 open
 openat
+read
+fstat
 fstatat
 unlinkat
 strlcat
 strlcpy
+flock
 fsync
 usleep
 strsep
@@ -44,4 +48,5 @@ chmod
 fchmod
 link
 realpath
+stat
 fopen=posix_fopen

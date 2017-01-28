@@ -14,6 +14,8 @@
 #include <direct.h>
 #include <io.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <ctype.h>
 #include <string.h>
 #include <bsd/string.h> /*strlcat && strlcpy*/
 #include <stdlib.h>
@@ -219,9 +221,11 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 	DWORD dwRet;
     HDEVBLK hDevBlk;
     HANDLE hDisk;
+    const char* pbuf;
 
 	offset = 0;
 
+    pbuf = pathname;
 	if (S_ISBLK(st_mode))
 	{
 		ulLen = strlcpy(szPath, pathname, MAX_PATH);
@@ -248,10 +252,38 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 	}
 	else
 	{
-		fd = _open(pathname, flags, mode);
+        if (pathname && pathname[0]=='/')
+        {
+            snprintf(szPath, MAX_PATH, "%s%s", "C:/ProgramData/Smartmobili/Posix4Win", pathname);
+            pbuf = szPath;
+        }
+
+		fd = _open(pbuf, flags, mode);
+        int err = errno;
+        if (err < 0)
+        {
+            printf("%d", err);
+        }
 	}
 
 	return fd;
+}
+
+
+int __cdecl close(int fd)
+{
+    int ret;
+    HDEVBLK hDevBlk;
+   
+    hDevBlk = DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd));
+    if (hDevBlk)
+    {
+        ret = devblk_close(fd);
+    }
+    else
+    {
+        ret = _close(fd);
+    }
 }
 
 int __cdecl 
@@ -266,17 +298,123 @@ sys_stat(const char *path, struct stat *buf)
 	return -1;
 }
 
+//+//int _tstati64(const TCHAR* path, struct _stati64 * buf)
+//+//{
+//+//  int ret;
+//+//  struct __stat64 buf64;
+//+//
+//+//  ret = _tstat64(path, &buf64);
+//+//  if (!ret)
+//+//    stat64_to_stati64(&buf64, buf);
+//+//  return ret;
+//+//}
+//+
+//+#endif
+//+
+//+HANDLE fdtoh(int fd); //file.c
+//+
+//+#if _USE_STAT64
+//+ int CDECL _tstat64(const _TCHAR *path, struct _stat64 *buf)
+//+ #else
+//+ int CDECL _tstat64i32(const _TCHAR *path, struct _stat64i32 *buf)
+//+ #endif
+//+ {
+//    +DWORD dw;
+//    +WIN32_FILE_ATTRIBUTE_DATA hfi;
+//    +unsigned short mode = ALL_S_IREAD;
+//    +int plen;
+//    +
+//        +TRACE(":file (%s) buf(%p)\n", path, buf);
+//    +
+//        +if (!GetFileAttributesEx(path, GetFileExInfoStandard, &hfi))
+//        + {
+//        +TRACE("failed (%d)\n", GetLastError());
+//        +__set_errno(ERROR_FILE_NOT_FOUND);
+//        +return -1;
+//        +}
+//    +
+//        +memset(buf, 0, sizeof(struct __stat64));
+//    +
+//        +  /* FIXME: rdev isn't drive num, despite what the docs say-what is it?
+//           +     Bon 011120: This FIXME seems incorrect
+//           +                 Also a letter as first char isn't enough to be classified
+//           +		 as a drive letter
+//           +  */
+//        +#ifndef _UNICODE
+//        + if (isalpha(*path) && (*(path + 1) == ':'))
+//        + buf->st_dev = buf->st_rdev = toupper(*path) - 'A'; /* drive num */
+//    +#else
+//        + if (iswalpha(*path))
+//        + buf->st_dev = buf->st_rdev = toupperW(*path - 'A'); /* drive num */
+//    +#endif
+//        + else
+//        + buf->st_dev = buf->st_rdev = _getdrive() - 1;
+//    +
+//        +#ifndef _UNICODE
+//        + plen = strlen(path);
+//    +#else
+//        + plen = strlenW(path);
+//    +#endif
+//        +
+//        +  /* Dir, or regular file? */
+//        +if ((hfi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
+//            +(path[plen - 1] == '\\'))
+//        + mode |= (_S_IFDIR | ALL_S_IEXEC);
+//    +else
+//        + {
+//        +mode |= _S_IFREG;
+//        +    /* executable? */
+//            +if (plen > 6 && path[plen - 4] == '.')  /* shortest exe: "\x.exe" */
+//            + {
+//            +#ifndef _UNICODE
+//                + unsigned int ext = tolower(path[plen - 1]) | (tolower(path[plen - 2]) << 8) |
+//                +(tolower(path[plen - 3]) << 16);
+//            +if (ext == EXE || ext == BAT || ext == CMD || ext == COM)
+//                + mode |= ALL_S_IEXEC;
+//            +#else
+//                + ULONGLONG ext = tolowerW(path[plen - 1]) | (tolowerW(path[plen - 2]) << 16) |
+//                +((ULONGLONG)tolowerW(path[plen - 3]) << 32);
+//            +if (ext == WCEXE || ext == WCBAT || ext == WCCMD || ext == WCCOM)
+//                + mode |= ALL_S_IEXEC;
+//            +#endif
+//                + }
+//        +}
+//    +
+//        +if (!(hfi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
+//        + mode |= ALL_S_IWRITE;
+//    +
+//        +buf->st_mode = mode;
+//    +buf->st_nlink = 1;
+//    +#if _USE_STAT64
+//        + buf->st_size = buf->st_size = ((__int64)hfi.nFileSizeHigh << 32) + hfi.nFileSizeLow;
+//    +#else
+//        + buf->st_size = hfi.nFileSizeLow;
+//    +#endif
+//        + RtlTimeToSecondsSince1970((LARGE_INTEGER *)&hfi.ftLastAccessTime, &dw);
+//    +buf->st_atime = dw;
+//    +RtlTimeToSecondsSince1970((LARGE_INTEGER *)&hfi.ftLastWriteTime, &dw);
+//    +buf->st_mtime = buf->st_ctime = dw;
+//    +TRACE("%d %d 0x%08lx%08lx %ld %ld %ld\n", buf->st_mode, buf->st_nlink,
+//        +(long)(buf->st_size >> 16), (long)buf->st_size,
+//        +(long)buf->st_atime, (long)buf->st_mtime, (long)buf->st_ctime);
+//    +return 0;
+//    +}
+
 int __cdecl
 stat(const char *path, struct stat *buf)
 {
 	int ret;
+    int fd;
 
-	ret = os_stat(path, (struct os_stat *)buf);
-	if (ret < 0)
-	{
-		int err = errno;
-	}
-	return ret;
+    fd = open(path, O_RDONLY);
+    if (fd < 1)
+        return fd;
+
+    ret = fstat(fd, buf);
+
+    close(fd);
+	
+    return ret;
 }
 
 
@@ -291,25 +429,9 @@ fstat(int fd, struct stat *buf)
 
 	/* first check this fd is not backed up by a handle */
 	handle = (HANDLE)_get_osfhandle(fd);
-	if (handle != INVALID_HANDLE_VALUE)
+	if (DevBlkFromDiskHandle(handle))
 	{
-		/* is it a device handle ?*/
-		if (FILE_TYPE_DISK == GetFileType(handle))
-		{
-			ret = 0;
-
-			if (buf)
-			{
-				buf->st_dev = 6;
-				buf->st_ino = 0;
-				buf->st_nlink = 1;
-				buf->st_mode = S_IFBLK;
-				buf->st_uid = 0;
-				buf->st_gid = 6;
-				buf->st_rdev = 2048;
-				buf->st_size = 0;
-			}
-		}
+        ret = devblk_fstat(fd, buf);
 	}
 	else
 	{

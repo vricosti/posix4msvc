@@ -83,9 +83,13 @@ typedef unsigned int dev_t;
 #endif
 
 /* Major, minor numbers, dev_t's. */
-#define	major(x)	((int32_t)(((uint32_t)(x) >> 24) & 0xff))
-#define	minor(x)	((int32_t)((x) & 0xffffff))
-#define	makedev(x,y)	((dev_t)(((x) << 24) | (y)))
+#define	major(x)	((int32_t)(((uint32_t)(x) >> 8)&0xff))	/* major number */
+#define	minor(x)	((int32_t)((x)&0xff))		/* minor number */
+#define	makedev(x,y)	((dev_t)(((x)<<8) | (y)))	/* create dev_t */
+
+//#define	major(x)	((int32_t)(((uint32_t)(x) >> 24) & 0xff))
+//#define	minor(x)	((int32_t)((x) & 0xffffff))
+//#define	makedev(x,y)	((dev_t)(((x) << 24) | (y)))
 
 #ifndef _PID_T_
 #define	_PID_T_

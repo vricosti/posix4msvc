@@ -53,6 +53,21 @@
 #define O_RANDOM     _O_RANDOM
 #endif /*!__STDC__*/
 
+#if __POSIX_VISIBLE >= 200809
+#define	O_CLOEXEC	0x00020000	/* atomically set FD_CLOEXEC */
+#endif
+#define	O_FBLOCKING	0x00040000	/* force blocking I/O */
+#define	O_FNONBLOCKING	0x00080000	/* force non-blocking I/O */
+#define	O_FAPPEND	0x00100000	/* force append mode for write */
+#define	O_FOFFSET	0x00200000	/* force specific offset */
+#define	O_FSYNCWRITE	0x00400000	/* force synchronous write */
+#define	O_FASYNCWRITE	0x00800000	/* force asynchronous write */
+#if defined(_KERNEL) || defined(_KERNEL_STRUCTURES)
+#define	O_UNUSED24	0x01000000
+#define	O_UNUSED25	0x02000000
+#define	O_UNUSED26	0x04000000
+#endif
+
 #endif /*_INC_FCNTL*/
 
 // xxxxat(openat, creatat, ...) flags
@@ -278,6 +293,8 @@ extern ssize_t write(int fd, const void *buf, size_t count); /* msvc implementat
 extern int __cdecl openat(int, const char*, int, ...);
 extern int __cdecl fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 extern int __cdecl unlinkat(int dirfd, const char *pathname, int flags);
+
+
 
 
 #ifdef  __cplusplus

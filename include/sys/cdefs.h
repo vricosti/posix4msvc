@@ -49,6 +49,8 @@
 #ifndef __has_builtin
 #define __has_builtin(x)        0
 #endif
+
+#define __POSIX_VISIBLE 200809
 /*
  * Macro to test if we're using a GNU C compiler of a specific vintage
  * or later, for e.g. features that appeared in a particular version

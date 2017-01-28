@@ -3,6 +3,7 @@
 #include <sys/types_ex.h>
 #include <io.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <errno.h>
 
 #include <get_osfhandle-nothrow.h>
@@ -18,7 +19,22 @@ link(const char *oldpath, const char *newpath)
 int __cdecl 
 access(const char *pathname, int mode)
 {
-    return _access(pathname, mode);
+    int ret;
+    int fd;
+
+    fd = open(pathname, _O_RDONLY);
+    if (fd < 1)
+        return -1;
+
+    if (DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd)))
+    {
+        close(fd);
+        ret = 0;
+    }
+    else
+        ret = _access(pathname, mode);
+
+    return ret;
 }
 
 char __cdecl
@@ -116,41 +132,26 @@ ssize_t __cdecl
 read(int fd, void *buf, size_t count)
 {
 	ssize_t size;
-	HANDLE handle;
+    HDEVBLK hDevBlk;
 	DWORD dwReadLen, dwErr;
 
     size = -1;
-	handle = (HANDLE)_get_osfhandle(fd);
-	if (handle != INVALID_HANDLE_VALUE)
-	{
-        HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
-        if (hDevBlk)
+    hDevBlk = DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd));
+    if (hDevBlk)
+    {
+        if (!DevBlkRead(hDevBlk, buf, count, &dwReadLen, NULL))
         {
-            if (DevBlkRead(hDevBlk, buf, count, &dwReadLen, NULL))
-            {
-                size = dwReadLen;
-            }
-            else
-            {
-                dwErr = GetLastError();
-            }
+            return -1;
         }
         else
         {
-            if (ReadFile(handle, buf, count, &dwReadLen, NULL))
-            {
-                size = dwReadLen;
-            }
-            else
-            {
-                dwErr = GetLastError();
-            }
+            size = dwReadLen;
         }
-	}
-	else
-	{
-		size = _read(fd, buf, count);
-	}
+    }
+    else
+    {
+        size = _read(fd, buf, count);
+    }
 
 	return size;
 }
