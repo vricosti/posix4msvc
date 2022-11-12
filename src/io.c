@@ -7,8 +7,9 @@
 #include <errno.h>
 
 #include <get_osfhandle-nothrow.h>
-#include "windevblk.h"
-
+#if BUILD_WINDEVBLK
+#   include "windevblk.h"
+#endif
 
 int __cdecl 
 link(const char *oldpath, const char *newpath)
@@ -25,15 +26,16 @@ access(const char *pathname, int mode)
     fd = open(pathname, _O_RDONLY);
     if (fd < 1)
         return -1;
-
+#if BUILD_WINDEVBLK
     if (DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd)))
     {
         close(fd);
         ret = 0;
     }
     else
+#else
         ret = _access(pathname, mode);
-
+#endif
     return ret;
 }
 
@@ -73,12 +75,14 @@ lseek(int fd, long offset, int origin)
 	handle = (HANDLE)_get_osfhandle(fd);
 	if (handle != INVALID_HANDLE_VALUE)
 	{
+#if BUILD_WINDEVBLK
         HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
         if (hDevBlk)
         {
             lret = DevBlkSetPointer(hDevBlk, offset, (void*)0, origin);
         }
         else
+#endif
         {
             lret = SetFilePointer(handle, offset, (void*)0, origin);
         }
@@ -103,6 +107,7 @@ lseek64(int fd, off64_t offset, int whence)
 	handle = (HANDLE)_get_osfhandle(fd);
 	if (handle != INVALID_HANDLE_VALUE)
 	{	
+#if BUILD_WINDEVBLK
         HDEVBLK hDevBlk = DevBlkFromDiskHandle(handle);
         if (hDevBlk)
         {
@@ -113,6 +118,7 @@ lseek64(int fd, off64_t offset, int whence)
             }
         }
         else
+#endif
         {
             liOffset.QuadPart = offset;
             if (SetFilePointerEx(handle, liOffset, &liNewOffset, whence) == TRUE)
@@ -132,10 +138,12 @@ ssize_t __cdecl
 read(int fd, void *buf, size_t count)
 {
 	ssize_t size;
-    HDEVBLK hDevBlk;
 	DWORD dwReadLen, dwErr;
 
     size = -1;
+
+#if BUILD_WINDEVBLK
+    HDEVBLK hDevBlk;
     hDevBlk = DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd));
     if (hDevBlk)
     {
@@ -149,6 +157,7 @@ read(int fd, void *buf, size_t count)
         }
     }
     else
+#endif
     {
         size = _read(fd, buf, count);
     }

@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <ctype.h>
 
 const char* __cdecl
 p4msvc_norm_path(const char* pathname, p4msvc_norm_path_t* pPath, int normalize)

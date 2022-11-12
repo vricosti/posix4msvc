@@ -1,0 +1,964 @@
+diff -ruN msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/msys_symlink.cc msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/msys_symlink.cc
+--- msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/msys_symlink.cc	2010-01-05 20:01:36 +0000
++++ msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/msys_symlink.cc	2010-03-24 17:13:33 +0000
+@@ -1,253 +1,592 @@
+-/* msys_symlink.c
+- * Copyright (C) 2002, Earnie Boyd
+- *               2010, Cesar Strauss
+- * This file is a part of MSYS.
+- * ***************************************************************************/
+-
+-/*
+-  Native w32 applications have no notion of POSIX-style symlinks. On the
+-  other hand, it is natural to assume that useful scripts and tools have
+-  come to rely on their existence. So, having some sort of symlink
+-  emulation makes it easier to port them to MSYS, provided they are
+-  transparent to w32 applications. One approximation that works in pratice
+-  is to replace symlink creation with a copy operation.
+-
+-  The semantics of the symlink operation under MSYS are as follow:
+-  1) The original source is copied to the destination.
+-  2) In case of a directory, a deep copy is performed.
+-  3) If the source path is relative, it is taken relative to the
+-     directory of the destination.
+-
+-  The following are the differences with respect to standard symlink
+-  behaviour:
+-  1) The original source must already exist at symlink creation time.
+-  2) Modifying the contents of the original source does not affect the
+-     destination and vice-versa.
+-  3) When creating a symlink pointing to a component of the symlink own
+-     path, the deep copy operation avoids descending into the newly created
+-     tree, to avoid infinite recursion.
+-     For instance:
+-     $ mkdir foo
+-     $ ln -s .. foo/bar
+-     On POSIX, you can dereference foo/bar/foo/bar/...
+-     On MSYS, it stops after foo/bar/foo
+-  4) When doing a deep copy operation, the directory traversal is done
+-     in the w32 domain. As a result, it does not traverse mount points
+-     found within the directory hierarchy.
+-     For instance: if foo/mnt is a mount point, then ls -s foo bar does
+-     not copy the contents of foo/mnt.
+-*/
+-
+-#include "msys_symlink.h"
+-#include "winsup.h"
+-#include "security.h"
+-#include "fhandler.h"
+-#include "path.h"
+-#include <ctype.h>
+-#if !DO_CPP_NEW
+-#include <stdlib.h>
+-#endif
+-
+-/*
+-  Create a deep copy of frompath as topath, while avoiding descending in
+-  origpath.
+-*/
+-static int
+-RecursiveCopy (char * frompath, char * topath, const char * origpath)
+-{
+-#if DO_CPP_NEW
+-  struct _WIN32_FIND_DATAA *dHfile = new struct _WIN32_FIND_DATAA;
+-#else
+-  struct _WIN32_FIND_DATAA *dHfile = (struct _WIN32_FIND_DATAA *) malloc (sizeof (struct _WIN32_FIND_DATAA));
+-#endif
+-  HANDLE dH;
+-  BOOL findfiles;
+-  int frompos = strlen (frompath);
+-  int topos = strlen (topath);
+-  int res = -1;
+-
+-  debug_printf("RecursiveCopy (%s, %s)", frompath, topath);
+-
+-  /* Create the destination directory */
+-  if (!CreateDirectoryEx (frompath, topath, NULL))
+-    {
+-      debug_printf("CreateDirectoryEx(%s, %s, 0) failed", frompath, topath);
+-      __seterrno ();
+-      goto done;
+-    }
+-  /* Descend into the source directory */
+-  if (frompos + 2 >= MAX_PATH || topos + 1 >= MAX_PATH)
+-    {
+-      set_errno (ENAMETOOLONG);
+-      goto done;
+-    }
+-  strcat (frompath, "\\*");
+-  strcat (topath, "\\");
+-  dH = FindFirstFile (frompath, dHfile);
+-  debug_printf("dHfile(1): %s", dHfile->cFileName);
+-  findfiles = FindNextFile (dH, dHfile);
+-  debug_printf("dHfile(2): %s", dHfile->cFileName);
+-  findfiles = FindNextFile (dH, dHfile);
+-  while (findfiles)
+-    {
+-      /* Append the directory item filename to both source and destination */
+-      int filelen = strlen (dHfile->cFileName);
+-      debug_printf("dHfile(3): %s", dHfile->cFileName);
+-      if (frompos + 1 + filelen >= MAX_PATH ||
+-          topos + 1 + filelen >= MAX_PATH)
+-        {
+-          set_errno (ENAMETOOLONG);
+-          goto done;
+-        }
+-      strcpy (&frompath[frompos+1], dHfile->cFileName);
+-      strcpy (&topath[topos+1], dHfile->cFileName);
+-      debug_printf("%s -> %s", frompath, topath);
+-      if (dHfile->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+-        {
+-          /* Recurse into the child directory */
+-          debug_printf("%s <-> %s", frompath, origpath);
+-          if (strcmp (frompath, origpath)) // avoids endless recursion
+-            if (RecursiveCopy (frompath, topath, origpath))
+-              goto done;
+-        }
+-      else
+-        {
+-          /* Just copy the file */
+-          if (!CopyFile (frompath, topath, FALSE))
+-            {
+-              __seterrno ();
+-              goto done;
+-            }
+-        }
+-      findfiles = FindNextFile (dH, dHfile);
+-    }
+-  if (GetLastError() != ERROR_NO_MORE_FILES)
+-    {
+-      __seterrno ();
+-      goto done;
+-    }
+-  res = 0;
+-
+-done:
+-#if DO_CPP_NEW
+-  delete dHfile;
+-#else
+-  free (dHfile);
+-#endif
+-  return res;
+-}
+-
+-extern "C"
+-int
+-msys_symlink (const char * topath, const char * frompath)
+-{
+-#if DO_CPP_NEW
+-  struct stat *sb_frompath = new struct stat;
+-  struct stat *sb_topath = new struct stat;
+-#else
+-  struct stat *sb_frompath = (struct stat *) malloc (sizeof (struct stat));
+-  struct stat *sb_topath = (struct stat *) malloc (sizeof (struct stat));
+-#endif
+-  char real_frompath[MAX_PATH];
+-  int res = -1;
+-
+-  debug_printf("msys_symlink (%s, %s)", frompath, topath);
+-
+-  if (strlen (frompath) >= MAX_PATH || strlen (topath) >= MAX_PATH)
+-    {
+-      set_errno (ENAMETOOLONG);
+-      goto done;
+-    }
+-
+-  if (isabspath (frompath))
+-    strcpy (real_frompath, frompath);
+-  else
+-    /* Find the real source path, relative
+-       to the directory of the destination */
+-    {
+-      /* Determine the character position of the last path component */
+-      int pos = strlen (topath);
+-      while (--pos >= 0)
+-        if (isdirsep (topath[pos]))
+-          break;
+-      /* Append the source path to the directory
+-         component of the destination */
+-      if (pos+1+strlen(frompath) >= MAX_PATH)
+-        {
+-          set_errno(ENAMETOOLONG);
+-          goto done;
+-        }
+-      strcpy (real_frompath, topath);
+-      strcpy (&real_frompath[pos+1], frompath);
+-    }
+-
+-  debug_printf("real_frompath: %s", real_frompath);
+-
+-  /* As a MSYS limitation, the source path must exist. */
+-  if (stat (real_frompath, sb_frompath))
+-    {
+-      debug_printf("Failed stat");
+-      goto done;
+-    }
+-  /* As per POSIX, the destination must not exist */
+-  if (stat (topath, sb_topath))
+-    {
+-      if (errno != ENOENT)
+-        {
+-          debug_printf("error: %d", errno);
+-          goto done;
+-        }
+-      else
+-        set_errno (0);
+-    }
+-  else
+-    {
+-      set_errno(EEXIST);
+-      goto done;
+-    }
+-  {
+-    /* Find the w32 equivalent of the source and destination */
+-    path_conv w_frompath (real_frompath, PC_SYM_NOFOLLOW | PC_FULL);
+-    if (w_frompath.error)
+-      {
+-        set_errno (w_frompath.error);
+-        goto done;
+-      }
+-    path_conv w_topath (topath, PC_SYM_NOFOLLOW | PC_FULL);
+-    if (w_topath.error)
+-      {
+-        set_errno (w_topath.error);
+-        goto done;
+-      }
+-    
+-    debug_printf("w32 paths: %s , %s",w_frompath.get_win32 (),w_topath.get_win32 ());
+-
+-    if (S_ISDIR (sb_frompath->st_mode))
+-      /* Start a deep recursive directory copy */
+-      {
+-        char origpath[MAX_PATH];
+-        strcpy (origpath, w_topath.get_win32 ());
+-        return RecursiveCopy (w_frompath.get_win32 (), w_topath.get_win32 (), origpath);
+-      }
+-    else
+-      /* Just copy the file */
+-      {
+-        if (!CopyFile (w_frompath, w_topath, FALSE))
+-          {
+-            __seterrno ();
+-            goto done;
+-          }
+-      }
+-  }
+-  res = 0;
+-
+-done:
+-#if DO_CPP_NEW
+-  delete sb_frompath;
+-  delete sb_topath;
+-#else
+-  free (sb_frompath);
+-  free (sb_topath);
+-#endif
+-  return res;
+-}
++/* msys_symlink.c
++* Copyright (C) 2002, Earnie Boyd
++*               2010, Cesar Strauss
++* This file is a part of MSYS.
++* ***************************************************************************/
++
++/*
++Native w32 applications have no notion of POSIX-style symlinks. On the
++other hand, it is natural to assume that useful scripts and tools have
++come to rely on their existence. So, having some sort of symlink
++emulation makes it easier to port them to MSYS, provided they are
++transparent to w32 applications. One approximation that works in pratice
++is to replace symlink creation with a copy operation.
++
++The semantics of the symlink operation under MSYS are as follow:
++1) The original source is copied to the destination.
++2) In case of a directory, a deep copy is performed.
++3) If the source path is relative, it is taken relative to the
++directory of the destination.
++
++The following are the differences with respect to standard symlink
++behaviour:
++1) The original source must already exist at symlink creation time.
++2) Modifying the contents of the original source does not affect the
++destination and vice-versa.
++3) When creating a symlink pointing to a component of the symlink own
++path, the deep copy operation avoids descending into the newly created
++tree, to avoid infinite recursion.
++For instance:
++$ mkdir foo
++$ ln -s .. foo/bar
++On POSIX, you can dereference foo/bar/foo/bar/...
++On MSYS, it stops after foo/bar/foo
++4) When doing a deep copy operation, the directory traversal is done
++in the w32 domain. As a result, it does not traverse mount points
++found within the directory hierarchy.
++For instance: if foo/mnt is a mount point, then ls -s foo bar does
++not copy the contents of foo/mnt.
++*/
++
++#include "msys_symlink.h"
++#include "winsup.h"
++#include "security.h"
++#include "fhandler.h"
++#include "path.h"
++#include <ctype.h>
++#if !DO_CPP_NEW
++#include <stdlib.h>
++#endif
++
++/* 
++*  MSYS DOESN'T SEEM TO ALLOW TO USE WCHAR FUNCTIONS
++*  SO WE REDECLARE SIMPLE ONES  
++*/
++static size_t  
++wcslen (const wchar_t * str)
++{
++	const wchar_t *eos = str;
++	while( *eos++ ) ;
++	return( (size_t)(eos - str - 1) );
++}
++
++static wchar_t*
++wcscpy (wchar_t* dst, const wchar_t* src)
++{
++	wchar_t * cp = dst;
++
++	while( *cp++ = *src++ )
++		;
++
++	return( dst );
++}
++static wchar_t * 
++wcscat (wchar_t * dst, const wchar_t * src)
++{
++	wchar_t * cp = dst;
++
++	while( *cp )
++		cp++;                   
++	while( *cp++ = *src++ ) ;       
++
++	return( dst );           
++}
++
++
++static int 
++create_hard_link (char *oldpath, char *newpath, symlink_env_t *symlink_env)
++{
++	int res = -1;
++
++	debug_printf("create_hard_link (%s, %s)", oldpath, newpath);
++
++	if (!CreateHardLinkA ((LPCSTR)newpath, (LPCSTR)oldpath, NULL))
++	{
++		__seterrno ();
++		goto done;
++	}
++
++	res = 0;
++done:
++	return res;
++}
++
++static int 
++create_junction (char *oldpath, char *newpath, symlink_env_t *symlink_env)
++{
++	int res = -1;
++	debug_printf("create_junction (%s, %s)", oldpath, newpath);
++	debug_printf("target path=[%s]", symlink_env->oldpath);
++	char reparseBuffer[MAX_PATH*3];
++	WCHAR wszNewPath[MAX_PATH+1];
++	WCHAR wszOldPath[MAX_PATH+1]; 
++	WCHAR targetNativeFileName[MAX_PATH+1];
++	HANDLE hFile;   
++	DWORD returnedLength;
++	PREPARSE_MOUNTPOINT_DATA_BUFFER reparseInfo =    
++		(PREPARSE_MOUNTPOINT_DATA_BUFFER) reparseBuffer; 
++
++	
++	// Convert paths into wchar_t
++	MultiByteToWideChar (CP_UTF8, 0, newpath, -1, wszNewPath, MAX_PATH);
++	MultiByteToWideChar (CP_UTF8, 0, symlink_env->oldpath, -1, wszOldPath, MAX_PATH);
++  
++	//   
++	// Build the native target name   
++	//
++	//swprintf( targetNativeFileName, L"\\??\\%s", wszToPath );
++	wcscpy(targetNativeFileName, L"\\??\\");
++	wcscat(targetNativeFileName, wszOldPath);
++     
++	if ( (targetNativeFileName[wcslen( targetNativeFileName )-1] == L'\\') &&   
++		(targetNativeFileName[wcslen( targetNativeFileName )-2] != L':')) {   
++			targetNativeFileName[wcslen( targetNativeFileName )-1] = 0;   
++	}    
++
++	if (CreateDirectoryW (wszNewPath, NULL) == 0)
++	{
++		debug_printf("create_junction: CreateDirectoryW failed ");
++		__seterrno ();
++		goto done;
++	}
++
++	hFile = CreateFileW (wszNewPath, GENERIC_READ | GENERIC_WRITE, 0, 0,
++		OPEN_ALWAYS, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
++		0);
++	if (hFile == INVALID_HANDLE_VALUE)
++	{
++		debug_printf("create_junction: CreateFileA failed ");
++		__seterrno ();
++		goto done;
++	}
++
++	//   
++	// Build the reparse info   
++	//   
++	memset( reparseInfo, 0, sizeof( *reparseInfo ));   
++	reparseInfo->ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;   
++	reparseInfo->ReparseTargetLength = wcslen( targetNativeFileName ) * sizeof(WCHAR);   
++	reparseInfo->ReparseTargetMaximumLength = reparseInfo->ReparseTargetLength + sizeof(WCHAR);   
++	wcscpy( reparseInfo->ReparseTarget, targetNativeFileName );   
++	reparseInfo->ReparseDataLength = reparseInfo->ReparseTargetLength + 12;
++
++	//   
++	// Set the link   
++	//   
++	if( !DeviceIoControl( hFile, FSCTL_SET_REPARSE_POINT,   
++		reparseInfo,    
++		reparseInfo->ReparseDataLength + REPARSE_MOUNTPOINT_HEADER_SIZE,   
++		NULL, 0, &returnedLength, NULL )) 
++	{    
++		__seterrno ();
++		debug_printf( "create_junction: Error setting junction");      
++		CloseHandle( hFile );   
++		RemoveDirectoryW( wszNewPath );  
++		goto done;
++	}
++
++	res = 0;
++done:
++	return res;
++}
++
++static int 
++create_native_symlink (char *oldpath, char *newpath, symlink_env_t *symlink_env)
++{
++	int res = -1;
++	HINSTANCE dll_handle;
++	CREATESYMBOLICLINKA pfnCreateSymbolicLinkA;
++	DWORD dwErr;
++
++	debug_printf("create_native_symlink (%s, %s)", oldpath, newpath);
++
++	dll_handle = LoadLibraryA ("kernel32.dll");
++	if (dll_handle) 
++	{
++		debug_printf("Successful loading of kernel32\n");
++		pfnCreateSymbolicLinkA = (CREATESYMBOLICLINKA) GetProcAddress (
++			dll_handle, 
++			"CreateSymbolicLinkA");
++
++		if (pfnCreateSymbolicLinkA)
++		{		
++			if (!pfnCreateSymbolicLinkA ((LPSTR)newpath, (LPSTR)symlink_env->oldpath, symlink_env->symlink_type))
++			{
++				debug_printf("CreateSymbolicLinkA(%s, %s, %d) failed", 
++					newpath, symlink_env->oldpath, symlink_env->symlink_type);
++				__seterrno ();
++				goto done;
++			}
++		}
++	}
++
++	res = 0;
++done:
++	FreeLibrary ( dll_handle );
++	return res;
++}
++
++/*
++Create a deep copy of oldpath as newpath, while avoiding descending in
++origfullpath.
++*/
++static int
++create_copy_dir (char *oldpath, char *newpath, symlink_env_t *symlink_env)
++{
++#if DO_CPP_NEW
++	struct _WIN32_FIND_DATAA *dHfile = new struct _WIN32_FIND_DATAA;
++#else
++	struct _WIN32_FIND_DATAA *dHfile = (struct _WIN32_FIND_DATAA *) malloc (sizeof (struct _WIN32_FIND_DATAA));
++#endif
++	HANDLE dH;
++	BOOL findfiles;
++	int frompos = strlen (oldpath);
++	int topos = strlen (newpath);
++	int res = -1;
++
++	debug_printf("create_copy_dir (%s, %s)", oldpath, newpath);
++
++	/* Create the destination directory */
++	if (!CreateDirectoryExA (oldpath, newpath, NULL))
++	{
++		debug_printf("CreateDirectoryEx(%s, %s, 0) failed", oldpath, newpath);
++		__seterrno ();
++		goto done;
++	}
++	/* Descend into the source directory */
++	if (frompos + 2 >= MAX_PATH || topos + 1 >= MAX_PATH)
++	{
++		set_errno (ENAMETOOLONG);
++		goto done;
++	}
++	strcat (oldpath, "\\*");
++	strcat (newpath, "\\");
++	dH = FindFirstFileA (oldpath, dHfile);
++	debug_printf("dHfile(1): %s", dHfile->cFileName);
++	findfiles = FindNextFileA (dH, dHfile);
++	debug_printf("dHfile(2): %s", dHfile->cFileName);
++	findfiles = FindNextFileA (dH, dHfile);
++	while (findfiles)
++	{
++		/* Append the directory item filename to both source and destination */
++		int filelen = strlen (dHfile->cFileName);
++		debug_printf("dHfile(3): %s", dHfile->cFileName);
++		if (frompos + 1 + filelen >= MAX_PATH ||
++			topos + 1 + filelen >= MAX_PATH)
++		{
++			set_errno (ENAMETOOLONG);
++			goto done;
++		}
++		strcpy (&oldpath[frompos+1], dHfile->cFileName);
++		strcpy (&newpath[topos+1], dHfile->cFileName);
++		debug_printf("%s -> %s", oldpath, newpath);
++		if (dHfile->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
++		{
++			/* Recurse into the child directory */
++			debug_printf("%s <-> %s", oldpath, symlink_env->origfullpath);
++			if (strcmp (oldpath, symlink_env->origfullpath)) // avoids endless recursion
++				if (create_copy_dir (oldpath, newpath, symlink_env))
++					goto done;
++		}
++		else
++		{
++			/* Just copy the file */
++			if (!CopyFileA (oldpath, newpath, FALSE))
++			{
++				__seterrno ();
++				goto done;
++			}
++		}
++		findfiles = FindNextFileA (dH, dHfile);
++	}
++	if (GetLastError() != ERROR_NO_MORE_FILES)
++	{
++		__seterrno ();
++		goto done;
++	}
++	res = 0;
++
++done:
++#if DO_CPP_NEW
++	delete dHfile;
++#else
++	free (dHfile);
++#endif
++	return res;
++}
++
++static int 
++create_copy_file (char *oldpath, char *newpath, symlink_env_t *symlink_env)
++{
++	int res = -1;
++
++	debug_printf("create_copy_file (%s, %s)", oldpath, newpath);
++
++	if (!CopyFileA (oldpath, newpath, FALSE))
++	{
++		__seterrno ();
++		goto done;
++	}
++
++done:
++	return res;
++}
++
++static BOOL 
++has_admin_perms()
++{
++	BOOL bRet = FALSE;
++	HANDLE hToken = NULL;
++	TOKEN_ELEVATION te;
++	DWORD dwReturnLength = 0;
++
++	//ASSERT( IsVista() );
++
++	memset ((void*)&te, 0, sizeof(TOKEN_ELEVATION));
++	if ( !OpenProcessToken( GetCurrentProcess(), TOKEN_QUERY, &hToken ) )
++	{
++		debug_printf("has_admin_perms: OpenProcessToken failed!");
++		goto done;
++	}
++
++	if ( !GetTokenInformation(hToken, TokenElevation, &te, sizeof( te ),
++		&dwReturnLength ) )
++	{
++		debug_printf("has_admin_perms: GetTokenInformation failed!");
++		goto done;
++	}
++	else
++	{
++		//ASSERT( dwReturnLength == sizeof( te ) );
++		bRet = te.TokenIsElevated ? TRUE : FALSE; 
++	}
++
++	CloseHandle( hToken );
++
++	debug_printf("has_admin_perms : %d", bRet);
++
++done:
++	return bRet;
++}
++
++
++static int 
++symlink_env_init (symlink_env_t *symlink_env)
++{
++	int res = -1;
++
++
++	BOOL bRet;
++	DWORD dwVer,dwMajVer,dwMinVer  = 0; 
++	DWORD fsflags = 0;
++	char fsname_buff[MAX_PATH+1];
++	DWORD fsname_bufflen = MAX_PATH;
++
++	if (!symlink_env)
++		goto done;
++
++	memset(symlink_env, 0, sizeof(symlink_env_t));
++	symlink_env->symlink_to_file = create_copy_dir;
++	symlink_env->symlink_to_dir  = create_copy_file;
++
++	/* Get OS version */
++	dwVer = GetVersion();
++	dwMajVer = (DWORD)(LOBYTE(LOWORD(dwVer)));
++	dwMinVer = (DWORD)(HIBYTE(LOWORD(dwVer)));
++
++	/* 
++	* Get FileSystem Type - SHOULD BE an information initialized during dll startup !!! 
++	*/
++	bRet = GetVolumeInformationA (0, 0, 0, 0, 0, &fsflags, fsname_buff, fsname_bufflen);
++	if (!bRet)
++	{
++		__seterrno ();
++		debug_printf("symlink_env_init: cannot retrieve filesystem type", errno);
++		goto done;
++	}
++
++	/* 
++	* On FAT filesystem - symlink_to_file/symlink_to_dir = copy 
++	* 
++	*/
++	if ((strncmp ((const char*)fsname_buff, "NTFS", 4) == 0))
++	{
++		/* Before Windows Vista */
++		if ((dwMajVer < 6))
++		{
++			symlink_env->symlink_to_file = create_hard_link;
++
++			if (getenv ("MSYS_ALLOW_JUNCTION") != 0) 
++			{
++				debug_printf("symlink_env_init: allow ntfs junction");
++				symlink_env->symlink_to_dir  = create_junction;
++			}
++			else
++				symlink_env->symlink_to_dir  = create_copy_dir;
++		}
++		else
++		{
++			/* 
++			* Check if we have admin permissions
++			* TODO : check if we can implement native symlink without admin perms
++			*/
++			if (has_admin_perms () == TRUE)
++			{
++				symlink_env->has_native_support = 1;
++				symlink_env->symlink_to_file = create_native_symlink;
++				symlink_env->symlink_to_dir  = create_native_symlink;
++			}
++			else
++			{
++				symlink_env->symlink_to_file = create_hard_link;
++				symlink_env->symlink_to_dir  = create_junction;
++			}
++		}
++	}
++
++	debug_printf("symlink_env_init: symlink_to_file=0x%x symlink_to_dir=0x%x", 
++		symlink_env->symlink_to_file,  symlink_env->symlink_to_dir);
++
++	res = 0;
++done:
++	return res;
++}
++
++static void 
++symlink_env_close (symlink_env_t *symlink_env)
++{
++	if (!symlink_env)
++		goto done;
++
++	/*if (symlink_env->has_native_support) 
++	{
++	FreeLibrary ((HINSTANCE)symlink_env->handle);
++	}*/
++
++done:
++	return;
++}
++
++/* 
++* oldpath = target path (ex: C:\TestDir or ..\foo\bar) - MUST EXIST
++* newpath = symlink_name -(ex: C:\TestDir_LNK) - MUST NOT EXIST
++*/
++extern "C"
++int
++msys_symlink (const char *oldpath, const char *newpath)
++{
++#if DO_CPP_NEW
++	struct stat *sb_oldpath = new struct stat;
++	struct stat *sb_newpath = new struct stat;
++#else
++	struct stat *sb_oldpath = (struct stat *) malloc (sizeof (struct stat));
++	struct stat *sb_newpath = (struct stat *) malloc (sizeof (struct stat));
++#endif
++	char real_oldpath[MAX_PATH+1];
++	int res = -1;
++	symlink_env_t symlink_env;
++
++	debug_printf("msys_symlink (%s, %s)", oldpath, newpath );
++
++	if (strlen (oldpath) >= MAX_PATH || strlen (newpath) >= MAX_PATH)
++	{
++		set_errno (ENAMETOOLONG);
++		goto done;
++	}
++
++	if (isabspath (oldpath))
++		strncpy (real_oldpath, oldpath, MAX_PATH);
++	else
++		/* Find the real source path, relative
++		to the directory of the destination */
++	{
++		/* Determine the character position of the last path component */
++		int pos = strlen (newpath);
++		while (--pos >= 0)
++			if (isdirsep (newpath[pos]))
++				break;
++		/* Append the source path to the directory
++		component of the destination */
++		if (pos+1+strlen(oldpath) >= MAX_PATH)
++		{
++			set_errno(ENAMETOOLONG);
++			goto done;
++		}
++		strncpy (real_oldpath, newpath, MAX_PATH);
++		strcpy (&real_oldpath[pos+1], oldpath);
++	}
++
++	debug_printf("real_oldpath: %s", real_oldpath);
++
++	/* As a MSYS limitation, the source path must exist. */
++	if (stat (real_oldpath, sb_oldpath))
++	{
++		debug_printf("Failed stat");
++		goto done;
++	}
++	/* As per POSIX, the destination must not exist */
++	if (stat (newpath, sb_newpath))
++	{
++		if (errno != ENOENT)
++		{
++			debug_printf("error: %d", errno);
++			goto done;
++		}
++		else
++			set_errno (0);
++	}
++	else
++	{
++		set_errno(EEXIST);
++		goto done;
++	}
++	{
++		/* Find the w32 equivalent of the source and destination */
++		path_conv w_oldpath (real_oldpath, PC_SYM_NOFOLLOW | PC_FULL);
++		if (w_oldpath.error)
++		{
++			set_errno (w_oldpath.error);
++			goto done;
++		}
++		path_conv w_newpath (newpath, PC_SYM_NOFOLLOW | PC_FULL);
++		if (w_newpath.error)
++		{
++			set_errno (w_newpath.error);
++			goto done;
++		}
++
++		debug_printf("w32 paths: %s , %s",w_oldpath.get_win32 (), w_newpath.get_win32 ());
++
++		/* From here path have been validated */
++		if (symlink_env_init(&symlink_env) != 0)
++			goto done;
++    
++		/* we save original path in case we will use junctions and symlinks 
++     * because in this case we use the path as it is without getting the
++     * full normalized path - Thus it respects relative path
++     */
++		 strncpy (symlink_env.oldpath, oldpath, MAX_PATH);
++		 strncpy (symlink_env.origfullpath, w_newpath.get_win32 (), MAX_PATH);
++		
++		if (S_ISDIR (sb_oldpath->st_mode))
++		{
++			symlink_env.symlink_type = kSymlinkDir;
++
++			res = symlink_env.symlink_to_dir (  w_oldpath.get_win32 (), 
++				w_newpath.get_win32 (), 
++				&symlink_env);
++			goto done;
++		}
++		else
++		{
++			symlink_env.symlink_type = kSymlinkFile;
++			res = symlink_env.symlink_to_file ( w_oldpath.get_win32 (),
++				w_newpath.get_win32 (),
++				&symlink_env);
++			goto done;
++		}
++	}
++	res = 0;
++
++done:
++#if DO_CPP_NEW
++	delete sb_oldpath;
++	delete sb_newpath;
++#else
++	free (sb_oldpath);
++	free (sb_newpath);
++#endif
++	symlink_env_close(&symlink_env);
++
++	return res;
++}
+diff -ruN msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/msys_symlink.h msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/msys_symlink.h
+--- msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/msys_symlink.h	2002-06-13 21:54:21 +0000
++++ msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/msys_symlink.h	2010-03-24 15:31:45 +0000
+@@ -1,13 +1,65 @@
+-/* msys_symlink.h
+- * Copyright (C) 2002, Earnie Boyd
+- * This file is a part of MSYS.
+- * ***************************************************************************/
+-
+-#include <w32api.h>
+-#include <windows.h>
+-#include <sys/stat.h>
+-#include <errno.h>
+-#include <sys/strace.h>
+-#include <sys/cygwin.h>
+-#include "cygerrno.h"
+-
++/* msys_symlink.h
++ * Copyright (C) 2002, Earnie Boyd
++ * This file is a part of MSYS.
++ * ***************************************************************************/
++
++#include <w32api.h>
++#include <windows.h>
++#include <winioctl.h>
++#include <sys/stat.h>
++#include <errno.h>
++#include <sys/strace.h>
++#include <sys/cygwin.h>
++#include "cygerrno.h"
++
++typedef enum _SYMLINK_TYPE
++{
++	kSymlinkFile = 0,
++	kSymlinkDir  = 1,
++	
++} SYMLINK_TYPE;
++
++struct symlink_env_s;
++typedef int (*SYMLINK_TO) (char * oldpath, char * newpath, struct symlink_env_s *symlink_env);
++
++typedef struct symlink_env_s
++{
++	int has_native_support;
++	void *handle;  			           /* native handle to kernel32.dll */
++	void *symbol_addr;		         /* address of  CreateSymbolicLinkA */
++	char oldpath[MAX_PATH+1];     /* original oldpath used by junctions/symlinks */
++	char origfullpath[MAX_PATH+1];
++  SYMLINK_TYPE symlink_type;
++	SYMLINK_TO symlink_to_file;
++	SYMLINK_TO symlink_to_dir;
++} symlink_env_t;
++
++
++/* !!! Should be declared in w32api !!! */
++BOOL WINAPI CreateSymbolicLinkA(
++  LPSTR lpSymlinkFileName,
++  LPSTR lpTargetFileName,
++  DWORD dwFlags
++);
++
++typedef BOOL ( WINAPI *CREATESYMBOLICLINKA ) (LPSTR, LPSTR ,DWORD);
++
++#define MAX_REPARSE_SIZE	17000 
++ 
++#define IO_REPARSE_TAG_SYMBOLIC_LINK      IO_REPARSE_TAG_RESERVED_ZERO         
++
++
++#define REPARSE_MOUNTPOINT_HEADER_SIZE   8 
++typedef struct { 
++    DWORD          ReparseTag; 
++    DWORD          ReparseDataLength; 
++    WORD           Reserved; 
++    WORD           ReparseTargetLength; 
++    WORD           ReparseTargetMaximumLength; 
++    WORD           Reserved1; 
++    WCHAR          ReparseTarget[1]; 
++} REPARSE_MOUNTPOINT_DATA_BUFFER, *PREPARSE_MOUNTPOINT_DATA_BUFFER; 
++
++
++
++
+diff -ruN msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/path.cc msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/path.cc
+--- msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/path.cc	2010-03-17 22:29:33 +0000
++++ msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/path.cc	2010-03-24 14:47:28 +0000
+@@ -2367,12 +2367,12 @@
+ 
+ extern "C"
+ int
+-symlink (const char *topath, const char *frompath)
++symlink (const char *oldpath, const char *newpath)
+ {
+-  TRACE_IN;
++    TRACE_IN;
+     int res;
+-    debug_printf("symlink (%s, %s)", topath, frompath);
+-    res = msys_symlink (frompath, topath);
++    debug_printf("symlink (%s, %s)", oldpath, newpath);
++    res = msys_symlink (oldpath, newpath);
+     return res;
+ }
+ 
+diff -ruN msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/syscalls.cc msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/syscalls.cc
+--- msysCORE-1.0.14-1-msys-1.0.14-src/source/winsup/cygwin/syscalls.cc	2009-12-28 18:40:18 +0000
++++ msysCORE-2.0.1-1-msys-2.0.1-1-src/source/winsup/cygwin/syscalls.cc	2010-03-24 12:24:18 +0000
+@@ -1147,8 +1147,7 @@
+ 	  buf->st_ctime   = to_time_t (&wfd.ftCreationTime);
+ 	  buf->st_size    = wfd.nFileSizeLow;
+ 	  buf->st_blksize = S_BLKSIZE;
+-	  buf->st_blocks  = ((unsigned long) buf->st_size +
+-			    S_BLKSIZE-1) / S_BLKSIZE;
++	  buf->st_blocks  = ((unsigned long) buf->st_size + S_BLKSIZE-1) / S_BLKSIZE;
+ 	  FindClose (handle);
+ 	}
+       res = 0;

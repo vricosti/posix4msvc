@@ -27,7 +27,13 @@ extern "C" {
 #define	__SIGN	0x8000		/* ignore this file in _fwalk */
 
 
+int __cdecl getc_unlocked(FILE* stream);
+
 FILE *__cdecl posix_fopen(const char *path, const char *mode);
+
+void __cdecl flockfile(FILE* filehandle);
+int __cdecl ftrylockfile(FILE* filehandle);
+void __cdecl funlockfile(FILE* filehandle);
 
 //FILE *__cdecl posix_fdopen(int fd, const char *mode);
 

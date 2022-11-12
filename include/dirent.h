@@ -71,7 +71,10 @@ long __cdecl  telldir (DIR*);
 void __cdecl  seekdir (DIR*, long);
 int __cdecl  dirfd(DIR *dirp);
 
-
+int __cdecl readdir_r(DIR * dirp, struct dirent * entry,
+					  struct dirent ** result);
+					 
+					 
 /* wide char versions */
 
 struct _wdirent

@@ -33,6 +33,7 @@
  * $FreeBSD: src/lib/libc/stdio/fopen.c,v 1.14 2008/04/22 17:03:32 jhb Exp $
  */
 
+#if 0
 #include "namespace.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -77,3 +78,4 @@ fopen(const char * __restrict file, const char * __restrict mode)
 		_sseek(fp, (fpos_t)0, SEEK_END);
 	return (fp);
 }
+#endif

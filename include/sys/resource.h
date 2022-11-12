@@ -38,21 +38,6 @@
 #define	_RESOURCE_H_
 
 /*
-* Microsoft defines struct timeval inside the Winsock.h. 
-* But at this point we don't want to use any socket !!!!
-* There is also a funny comment inside the header "...taken from the BSD file sys/time.h."
-* So please put it back inside sys/time.h
-*/
-#ifdef _MSC_VER
-#ifndef _WINSOCKAPI_
-struct timeval {
-        long    tv_sec;         /* seconds */
-        long    tv_usec;        /* and microseconds */
-};
-#endif /* !_WINSOCKAPI_ */
-#endif /* !_MSC_VER */
-
-/*
  * Process priority specifications to get/setpriority.
  */
 #define	PRIO_MIN	-20

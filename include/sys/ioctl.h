@@ -12,8 +12,9 @@
 /* All the headers include this file. */
 #include <crtdefs.h>
 
+#if BUILD_WINDEVBLK
 extern int __cdecl ioctl(int fd, unsigned long request, ...);
-
+#endif
 
 #endif	/* Not _IOCTL_H_ */
 

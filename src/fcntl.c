@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
-#include <bsd/string.h> /*strlcat && strlcpy*/
+//#include <bsd/string.h> /*strlcat && strlcpy*/
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -25,15 +25,15 @@
 #include <get_osfhandle-nothrow.h>
 #include <p4msvc_utils.h>
 
-#include "windevblk.h"
+#if BUILD_WINDEVBLK
+#	include "windevblk.h"
+#endif
 
 
-
-
-
-
+#if BUILD_WINDEVBLK
 int __cdecl
 sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode);
+#endif
 
 int __cdecl
 __openat(int fd, const char *pathname, int flags, mode_t mode);
@@ -208,6 +208,7 @@ __openat(int dirfd, const char *pathname, int flags, mode_t mode)
 	return fd;
 }
 
+#ifdef BUILD_WINDEVBLK
 int __cdecl
 sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 {
@@ -219,9 +220,10 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 	int devNb, partNb;
     char * pEnd;
 	DWORD dwRet;
-    HDEVBLK hDevBlk;
     HANDLE hDisk;
     const char* pbuf;
+	HDEVBLK hDevBlk;
+
 
 	offset = 0;
 
@@ -268,11 +270,12 @@ sys_open(const char *pathname, unsigned short st_mode, int flags, mode_t mode)
 
 	return fd;
 }
-
+#endif
 
 int __cdecl close(int fd)
 {
     int ret;
+#ifdef BUILD_WINDEVBLK
     HDEVBLK hDevBlk;
    
     hDevBlk = DevBlkFromDiskHandle((HANDLE)_get_osfhandle(fd));
@@ -281,6 +284,7 @@ int __cdecl close(int fd)
         ret = devblk_close(fd);
     }
     else
+#endif
     {
         ret = _close(fd);
     }

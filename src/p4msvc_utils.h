@@ -18,7 +18,7 @@ typedef struct p4msvc_norm_path_s
 	BOOL  isAbsolute;
 	BOOL  isNormalized;
 	unsigned short st_mode;
-	char  szNormalizedPath[MAX_PATH];
+	char  szNormalizedPath[4096];
 
 } p4msvc_norm_path_t;
 

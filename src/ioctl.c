@@ -1,3 +1,4 @@
+#if BUILD_WINDEVBLK
 #define __USE_MAXGW
 
 #define WIN32_LEAN_AND_MEAN
@@ -63,3 +64,4 @@ ioctl(int fd, unsigned long request, ...)
 
 	return ret;
 }
+#endif

@@ -96,7 +96,6 @@ typedef unsigned int dev_t;
 #ifndef _WIN64
 typedef int	_pid_t;
 #else
-__MINGW_EXTENSION
 typedef __int64	_pid_t;
 #endif
 
@@ -142,7 +141,6 @@ typedef long	suseconds_t;	/* signed # of microseconds */
 #ifndef _SIGSET_T_
 #define _SIGSET_T_
 #ifdef _WIN64
-__MINGW_EXTENSION
 typedef unsigned long long _sigset_t;
 #else
 typedef unsigned long	_sigset_t;

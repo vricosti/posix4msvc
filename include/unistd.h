@@ -7,14 +7,14 @@
 #define _UNISTD_H
 #define __UNISTD_H_SOURCED__ 1
 
+#include <stdio.h>
 #include <io.h>
 #include <process.h>
 
 #include <sys/types.h>
 #include <sys/types_ex.h>
 #include <strings.h>
-#include "stdio.h"
-#include "stdlib.h"
+
 
 /***********************************************************************/
 // Since sys/stat.h is already defined by microsoft we include missing definitions
@@ -220,8 +220,8 @@ int __cdecl readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz
 int __cdecl faccessat(int dirfd, const char *pathname, int mode, int flags);
 
 /* normally defined inside <stdlib.h> */
-int __cdecl mkstemp(char *template);
-//int __cdecl mkostemp(char *template, int flags);
+int __cdecl mkstemp(char *mktemplate);
+//int __cdecl mkostemp(char *mktemplate, int flags);
 /*------------------------------------*/
 
 /* normally defined inside <string.h> */
@@ -230,6 +230,8 @@ char *__cdecl strdupa(const char *s);
 char *__cdecl strndupa(const char *s, size_t n);
 char *__cdecl strsep(char **stringp, const char *delim);
 
+size_t	 strlcat(char*, const char*, size_t);
+size_t	 strlcpy(char*, const char*, size_t);
 
 /* normally defined inside <sys/stat.h>*/
 int __cdecl mkdir(const char *pathname, mode_t mode);
@@ -261,8 +263,8 @@ int __cdecl vasprintf(char **strp, const char *fmt, va_list ap);
 int __cdecl fsync(int fd);
 int __cdecl fdatasync(int fd);
 
-
-
+int __cdecl truncate(const char* path, off_t length);
+int __cdecl ftruncate(int fildes, off_t length);
 
 #ifdef __cplusplus
 }
